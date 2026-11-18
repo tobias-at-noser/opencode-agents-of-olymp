@@ -1,3 +1,5 @@
+![Greek mythological figures gather around a sphinx, architectural plans, and a labyrinth on a marble terrace.](assets/agents-of-olymp.jpg)
+
 # Agents of Olymp
 
 An OpenCode V2 plugin with Sphinx as a shared entry point and Greek-mythology-inspired specialists.
