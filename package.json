@@ -1,0 +1,14 @@
+{
+  "name": "opencode-agents-of-olymp",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "Apache-2.0",
+  "exports": {
+    "./server": "./server.mjs"
+  },
+  "files": ["server.mjs", "agents"],
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}
