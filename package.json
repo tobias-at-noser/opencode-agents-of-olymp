@@ -7,7 +7,7 @@
   "exports": {
     "./server": "./server.mjs"
   },
-  "files": ["server.mjs", "agents"],
+  "files": ["server.mjs", "agents", "skills"],
   "scripts": {
     "test": "node --test test/*.test.mjs"
   }

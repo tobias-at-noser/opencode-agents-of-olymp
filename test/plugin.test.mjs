@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import plugin, { applyAgents, applyDelegationDefault, applyReasoningDefault, loadAgents } from "../server.mjs";
+import { readFileSync, readdirSync } from "node:fs";
+import plugin, { applyAgents, applyDelegationDefault, applyReasoningDefault, applySkills, loadAgents, loadSkills } from "../server.mjs";
 
 function editorWith(entries = {}) {
   const entriesById = new Map(Object.entries(entries));
@@ -15,7 +16,27 @@ function editorWith(entries = {}) {
   };
 }
 
-test("package loads both role formats and creates the entry and specialists", () => {
+test("skills are discoverable, loadable, and preserve existing definitions", () => {
+  const skills = loadSkills();
+  assert.deepEqual(skills.map(({ id }) => id), ["olymp-architecture", "olymp-debugging", "olymp-implementation", "olymp-planning"]);
+  for (const skill of skills) {
+    assert.equal(skill.name, skill.id);
+    assert.ok(skill.description && skill.content);
+    assert.ok(readFileSync(skill.path, "utf8").includes(skill.content));
+  }
+  assert.match(skills.find(({ id }) => id === "olymp-implementation").content, /Clean Code, and other practices where they help/);
+  const existing = { id: "olymp-debugging", content: "project override" };
+  const entries = new Map([[existing.id, existing]]);
+  applySkills({ get: (id) => entries.get(id), add: (skill) => entries.set(skill.id, skill) }, skills);
+  assert.equal(entries.size, 4);
+  assert.equal(entries.get(existing.id), existing);
+  assert.equal(entries.get("olymp-planning").content, skills.find(({ id }) => id === "olymp-planning").content);
+});
+
+test("package contains Markdown definitions and creates the entry and specialists", () => {
+  assert.deepEqual(readdirSync(new URL("../agents/", import.meta.url)).sort(), [
+    "ariadne.md", "athene.md", "daidalos.md", "hermes.md", "metis.md", "sphinx.md", "themis.md",
+  ]);
   const definitions = loadAgents();
   const editor = editorWith();
   applyAgents(editor, definitions);
@@ -24,10 +45,33 @@ test("package loads both role formats and creates the entry and specialists", ()
     const agent = editor.entriesById.get(id);
     assert.ok(agent?.description && agent?.system, id);
     assert.equal(agent.mode, id === "sphinx" ? "primary" : "subagent");
-    if (id !== "sphinx") {
-      assert.ok(agent.model?.providerID && agent.model?.id && agent.model?.variant, id);
-    }
+    assert.ok(agent.model?.providerID && agent.model?.id && agent.model?.variant, id);
   }
+  assert.deepEqual(editor.entriesById.get("sphinx").model, {
+    providerID: "personal", id: "gpt-6.1-terra", variant: "medium",
+  });
+});
+
+test("converted Markdown definitions preserve the original agent configuration", () => {
+  const definitions = loadAgents();
+  for (const [id, description, mode, model, variant, system] of [
+    ["athene", "Researches and answers working questions. Athene is the Greek goddess of wisdom and skilled counsel.", "subagent", "gpt-6.1-terra", "low", "Research and answer the assigned question using evidence appropriate to the task. Distinguish facts from uncertainty and cite useful sources. An occasional mythological allusion may complement, not replace, the answer."],
+    ["daidalos", "Implements changes and addresses review feedback. Daidalos is the Greek mythical inventor and master craftsman.", "subagent", "gpt-6.1-terra", "medium", "Implement the assigned change or review feedback in the project's context. Validate the changed behavior and report the result. For implementation work, make focused commits by default; carry out delivery steps covered by the initial request using suitable available tools. An occasional mythological allusion may complement, not replace, the answer."],
+    ["sphinx", "Receives open-ended assignments and brings in suitable specialists. The Sphinx is the Greek mythical guardian known for her riddle.", "primary", "gpt-6.1-terra", "medium", "Understand the assignment and involve suitable available specialists as the work calls for, without imposing a fixed workflow or limiting the kinds of work. Integrate their contributions into a useful answer. An occasional mythological allusion may complement, but never replace, the substance."],
+    ["themis", "Independently reviews work and reports findings. Themis is the Greek goddess of justice and sound judgment.", "subagent", "gpt-6.2-sol", "medium", "Independently examine the assigned work against its intended outcome and relevant risks. Report concrete, evidence-backed findings and their impact, or state when none were found; do not implement the changes under review. An occasional mythological allusion may complement, not replace, the review."],
+  ]) {
+    assert.deepEqual(definitions.get(id), {
+      description, mode, model: { providerID: "personal", id: model, variant }, system,
+    }, id);
+  }
+});
+
+test("Sphinx reasoning default preserves the primary session's selected model", async () => {
+  const definitions = loadAgents();
+  const request = { agent: "sphinx", kind: "primary", model: { providerID: "user", id: "selected" } };
+  const models = async () => ({ data: [{ providerID: "user", id: "selected", variants: [{ id: "medium" }] }] });
+  await applyReasoningDefault(request, definitions, {}, models);
+  assert.deepEqual(request.model, { providerID: "user", id: "selected", variant: "medium" });
 });
 
 test("plugin options independently override model and variant", () => {
@@ -100,12 +144,17 @@ test("delegation adds an available reasoning default without changing explicit c
   assert.equal(unsupportedVariant.input.model, undefined);
 });
 
-test("setup registers and disposes transform and hooks", async () => {
+test("setup registers and disposes transforms and hooks", async () => {
   let callback;
   const disposed = [];
   const cleanup = await plugin.setup({ agent: { async transform(fn) {
     callback = fn;
     return { async dispose() { disposed.push("transform"); } };
+  } }, skill: { async transform(fn) {
+    const skills = new Map();
+    fn({ get: (id) => skills.get(id), add: (skill) => skills.set(skill.id, skill) });
+    assert.equal(skills.size, 4);
+    return { async dispose() { disposed.push("skills"); } };
   } }, tool: { async hook(name) {
     assert.equal(name, "execute.before");
     return { async dispose() { disposed.push("delegation"); } };
@@ -117,5 +166,5 @@ test("setup registers and disposes transform and hooks", async () => {
   callback(editor);
   assert.equal(editor.defaultID, "sphinx");
   await cleanup();
-  assert.deepEqual(disposed, ["hook", "delegation", "transform"]);
+  assert.deepEqual(disposed, ["hook", "delegation", "skills", "transform"]);
 });

@@ -2,7 +2,7 @@
 {
   "mode": "subagent",
   "description": "Designs application architectures and explains their trade-offs. Metis is the Greek personification of wisdom and skilled counsel.",
-  "model": "personal/gpt-6.1-terra#medium"
+  "model": "personal/gpt-6.2-sol#medium"
 }
 ---
 
