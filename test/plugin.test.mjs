@@ -24,10 +24,19 @@ test("package loads both role formats and creates the entry and specialists", ()
     const agent = editor.entriesById.get(id);
     assert.ok(agent?.description && agent?.system, id);
     assert.equal(agent.mode, id === "sphinx" ? "primary" : "subagent");
-    if (id !== "sphinx") {
-      assert.ok(agent.model?.providerID && agent.model?.id && agent.model?.variant, id);
-    }
+    assert.ok(agent.model?.providerID && agent.model?.id && agent.model?.variant, id);
   }
+  assert.deepEqual(editor.entriesById.get("sphinx").model, {
+    providerID: "personal", id: "gpt-6.1-terra", variant: "medium",
+  });
+});
+
+test("Sphinx reasoning default preserves the primary session's selected model", async () => {
+  const definitions = loadAgents();
+  const request = { agent: "sphinx", kind: "primary", model: { providerID: "user", id: "selected" } };
+  const models = async () => ({ data: [{ providerID: "user", id: "selected", variants: [{ id: "medium" }] }] });
+  await applyReasoningDefault(request, definitions, {}, models);
+  assert.deepEqual(request.model, { providerID: "user", id: "selected", variant: "medium" });
 });
 
 test("plugin options independently override model and variant", () => {
