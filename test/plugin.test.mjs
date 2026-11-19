@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync } from "node:fs";
-import plugin, { applyAgents, applyDelegationDefault, applyReasoningDefault, loadAgents } from "../server.mjs";
+import { readFileSync, readdirSync } from "node:fs";
+import plugin, { applyAgents, applyDelegationDefault, applyReasoningDefault, applySkills, loadAgents, loadSkills } from "../server.mjs";
 
 function editorWith(entries = {}) {
   const entriesById = new Map(Object.entries(entries));
@@ -15,6 +15,22 @@ function editorWith(entries = {}) {
     default(id) { this.defaultID = id; },
   };
 }
+
+test("skills are discoverable, loadable, and preserve existing definitions", () => {
+  const skills = loadSkills();
+  assert.deepEqual(skills.map(({ id }) => id), ["olymp-architecture", "olymp-debugging", "olymp-implementation", "olymp-planning"]);
+  for (const skill of skills) {
+    assert.equal(skill.name, skill.id);
+    assert.ok(skill.description && skill.content);
+    assert.ok(readFileSync(skill.path, "utf8").includes(skill.content));
+  }
+  const existing = { id: "olymp-debugging", content: "project override" };
+  const entries = new Map([[existing.id, existing]]);
+  applySkills({ get: (id) => entries.get(id), add: (skill) => entries.set(skill.id, skill) }, skills);
+  assert.equal(entries.size, 4);
+  assert.equal(entries.get(existing.id), existing);
+  assert.equal(entries.get("olymp-planning").content, skills.find(({ id }) => id === "olymp-planning").content);
+});
 
 test("package contains Markdown definitions and creates the entry and specialists", () => {
   assert.deepEqual(readdirSync(new URL("../agents/", import.meta.url)).sort(), [
@@ -127,12 +143,17 @@ test("delegation adds an available reasoning default without changing explicit c
   assert.equal(unsupportedVariant.input.model, undefined);
 });
 
-test("setup registers and disposes transform and hooks", async () => {
+test("setup registers and disposes transforms and hooks", async () => {
   let callback;
   const disposed = [];
   const cleanup = await plugin.setup({ agent: { async transform(fn) {
     callback = fn;
     return { async dispose() { disposed.push("transform"); } };
+  } }, skill: { async transform(fn) {
+    const skills = new Map();
+    fn({ get: (id) => skills.get(id), add: (skill) => skills.set(skill.id, skill) });
+    assert.equal(skills.size, 4);
+    return { async dispose() { disposed.push("skills"); } };
   } }, tool: { async hook(name) {
     assert.equal(name, "execute.before");
     return { async dispose() { disposed.push("delegation"); } };
@@ -144,5 +165,5 @@ test("setup registers and disposes transform and hooks", async () => {
   callback(editor);
   assert.equal(editor.defaultID, "sphinx");
   await cleanup();
-  assert.deepEqual(disposed, ["hook", "delegation", "transform"]);
+  assert.deepEqual(disposed, ["hook", "delegation", "skills", "transform"]);
 });

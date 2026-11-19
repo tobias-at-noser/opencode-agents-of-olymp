@@ -1,6 +1,28 @@
 import { readdirSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const directory = new URL("./agents/", import.meta.url);
+const skillsDirectory = new URL("./skills/", import.meta.url);
+
+export function loadSkills() {
+  return readdirSync(skillsDirectory, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((entry) => {
+      const path = fileURLToPath(new URL(`${entry.name}/SKILL.md`, skillsDirectory));
+      const content = readFileSync(path, "utf8");
+      const frontmatter = /^---\s*\r?\n([\s\S]*?)\r?\n---\s*\r?\n([\s\S]*)$/.exec(content);
+      if (!frontmatter) throw new Error(`Missing JSON frontmatter in ${path}`);
+      const { name, description } = JSON.parse(frontmatter[1]);
+      return { id: entry.name, name, description, path, content: frontmatter[2].trim() };
+    });
+}
+
+export function applySkills(editor, skills) {
+  for (const skill of skills) {
+    if (!editor.get(skill.id)) editor.add(skill);
+  }
+}
 
 function modelRef(value) {
   if (typeof value === "string") {
@@ -95,8 +117,10 @@ export default {
   id: "agents-of-olymp",
   async setup(context) {
     const definitions = loadAgents();
+    const skills = loadSkills();
     const overrides = context.options?.agents;
     const registration = await context.agent.transform((editor) => applyAgents(editor, definitions, overrides));
+    const skillRegistration = await context.skill.transform((editor) => applySkills(editor, skills));
     const delegation = await context.tool.hook("execute.before", (event) =>
       applyDelegationDefault(event, definitions, overrides, (agentID) => context.agent.get({ agentID }), () => context.model.list()));
     const hook = await context.session.hook("experimental.model.resolve", (request) =>
@@ -104,6 +128,7 @@ export default {
     return async () => {
       await hook.dispose();
       await delegation.dispose();
+      await skillRegistration.dispose();
       await registration.dispose();
     };
   },

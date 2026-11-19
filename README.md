@@ -31,4 +31,6 @@ OpenCode loads Sphinx as the default entry agent. Describe the work normally; Sp
 
 Use a model and variant available in your own OpenCode environment. Models also accept OpenCode's expanded model-reference form. Native OpenCode `agents` configuration takes precedence over plugin defaults. GitHub is only the distribution source; project work does not depend on a particular host or stack.
 
+The plugin also advertises task-specific skills for bug investigation, proportionate planning, architecture design, and implementation. Agents can load them when relevant; they do not impose a fixed workflow. Existing skills with the same IDs take precedence. Skill permissions remain controlled by OpenCode.
+
 For example, a substantive result might end: “The trade-off is lower coupling at the cost of another network hop. Like Ariadne's thread, the interface keeps the path through that complexity visible.”
