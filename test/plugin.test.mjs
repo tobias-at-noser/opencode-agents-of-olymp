@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readdirSync } from "node:fs";
 import plugin, { applyAgents, applyDelegationDefault, applyReasoningDefault, loadAgents } from "../server.mjs";
 
 function editorWith(entries = {}) {
@@ -15,7 +16,10 @@ function editorWith(entries = {}) {
   };
 }
 
-test("package loads both role formats and creates the entry and specialists", () => {
+test("package contains Markdown definitions and creates the entry and specialists", () => {
+  assert.deepEqual(readdirSync(new URL("../agents/", import.meta.url)).sort(), [
+    "ariadne.md", "athene.md", "daidalos.md", "hermes.md", "metis.md", "sphinx.md", "themis.md",
+  ]);
   const definitions = loadAgents();
   const editor = editorWith();
   applyAgents(editor, definitions);
@@ -29,6 +33,20 @@ test("package loads both role formats and creates the entry and specialists", ()
   assert.deepEqual(editor.entriesById.get("sphinx").model, {
     providerID: "personal", id: "gpt-6.1-terra", variant: "medium",
   });
+});
+
+test("converted Markdown definitions preserve the original agent configuration", () => {
+  const definitions = loadAgents();
+  for (const [id, description, mode, model, variant, system] of [
+    ["athene", "Researches and answers working questions. Athene is the Greek goddess of wisdom and skilled counsel.", "subagent", "gpt-6.1-terra", "low", "Research and answer the assigned question using evidence appropriate to the task. Distinguish facts from uncertainty and cite useful sources. An occasional mythological allusion may complement, not replace, the answer."],
+    ["daidalos", "Implements changes and addresses review feedback. Daidalos is the Greek mythical inventor and master craftsman.", "subagent", "gpt-6.1-terra", "medium", "Implement the assigned change or review feedback in the project's context. Validate the changed behavior and report the result. For implementation work, make focused commits by default; carry out delivery steps covered by the initial request using suitable available tools. An occasional mythological allusion may complement, not replace, the answer."],
+    ["sphinx", "Receives open-ended assignments and brings in suitable specialists. The Sphinx is the Greek mythical guardian known for her riddle.", "primary", "gpt-6.1-terra", "medium", "Understand the assignment and involve suitable available specialists as the work calls for, without imposing a fixed workflow or limiting the kinds of work. Integrate their contributions into a useful answer. An occasional mythological allusion may complement, but never replace, the substance."],
+    ["themis", "Independently reviews work and reports findings. Themis is the Greek goddess of justice and sound judgment.", "subagent", "gpt-6.2-sol", "medium", "Independently examine the assigned work against its intended outcome and relevant risks. Report concrete, evidence-backed findings and their impact, or state when none were found; do not implement the changes under review. An occasional mythological allusion may complement, not replace, the review."],
+  ]) {
+    assert.deepEqual(definitions.get(id), {
+      description, mode, model: { providerID: "personal", id: model, variant }, system,
+    }, id);
+  }
 });
 
 test("Sphinx reasoning default preserves the primary session's selected model", async () => {
