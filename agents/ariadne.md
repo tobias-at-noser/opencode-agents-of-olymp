@@ -2,7 +2,7 @@
 {
   "mode": "subagent",
   "description": "Clarifies and refines requirements with relevant stakeholder perspectives. Ariadne is the Greek mythological figure who gave Theseus the thread to navigate the labyrinth.",
-  "model": "swissmon/gpt-6.2-sol#medium"
+  "model": "personal/gpt-6.2-sol#medium"
 }
 ---
 
