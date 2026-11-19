@@ -24,6 +24,7 @@ test("skills are discoverable, loadable, and preserve existing definitions", () 
     assert.ok(skill.description && skill.content);
     assert.ok(readFileSync(skill.path, "utf8").includes(skill.content));
   }
+  assert.match(skills.find(({ id }) => id === "olymp-implementation").content, /Clean Code, and other practices where they help/);
   const existing = { id: "olymp-debugging", content: "project override" };
   const entries = new Map([[existing.id, existing]]);
   applySkills({ get: (id) => entries.get(id), add: (skill) => entries.set(skill.id, skill) }, skills);
