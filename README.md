@@ -4,6 +4,16 @@
 
 An OpenCode V2 plugin with Sphinx as a shared entry point and Greek-mythology-inspired specialists.
 
+## Agents
+
+- **Sphinx** — The primary entry agent; understands assignments and brings in suitable specialists.
+- **Ariadne** — Clarifies and refines requirements with relevant stakeholder perspectives.
+- **Athene** — Researches and answers working questions.
+- **Daidalos** — Implements changes and addresses review feedback.
+- **Hermes** — Delivers changes through focused commits and pull or merge requests.
+- **Metis** — Designs application architectures and explains their trade-offs.
+- **Themis** — Independently reviews work and reports findings.
+
 ## Install
 
 Install from the upstream Git repository:
